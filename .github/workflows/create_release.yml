@@ -1,0 +1,50 @@
+name: Create Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Check out the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      # Fetch latest release tag
+      - name: Get latest release
+        id: latest_release
+        run: |
+          LATEST_RELEASE=$(curl --silent "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r .tag_name)
+          echo "LATEST_RELEASE=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Bump the patch version
+      - name: Bump patch version
+        id: bump_version
+        run: |
+          LATEST_VERSION=${{ steps.latest_release.outputs.LATEST_RELEASE }}
+          IFS='.' read -ra VERSION_PARTS <<< "$LATEST_VERSION"
+          PATCH_BUMP=$(( ${VERSION_PARTS[2]} + 1 ))
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.$PATCH_BUMP"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      # Zip the wdl files
+      - name: Create bundle zip
+        run: zip -r bundle.zip *.wdl
+
+      # Create a release
+      - name: Create Release
+        run: gh release create ${{ steps.bump_version.outputs.NEW_VERSION }} main.wdl bundle.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+
+
+
